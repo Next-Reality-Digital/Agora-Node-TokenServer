@@ -50,11 +50,10 @@ jobs:
 
           echo "Secrets fetched and saved to .env file."
 
-      - name: Clean .env file
+      - name: Remove the 'Secret value ' from the .env file
         run: |
-          # Filter only valid environment variable lines (ignore lines that don't contain '=')
-          grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env > .env.clean
-          mv .env.clean .env
+          # Remove the 'Secret value: ' from the .env file
+          sed -i 's/Secret value: //g' .env
 
       - name: Generate new .env file from template
         run: |
@@ -101,25 +100,22 @@ jobs:
           source .env
           set +a
 
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no" \
-          --exclude=".git/" --exclude=".github/" --exclude=".env" --exclude=".env.template" --exclude=".env.generated" --exclude=".vscode/" --rsync-path="rsync" \
-          ./ ${{ steps.source-env.outputs.SSH_USER }}@${{ steps.source-env.outputs.SSH_HOST }}:/tmp/${{ steps.source-env.outputs.DOMAIN_NAME }}
+          rsync -vz --no-perms --no-owner --no-group -e "ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no" \
+          --exclude=".git/" --exclude=".github/" --exclude=".env" --exclude=".env.template" --exclude=".env.generated" --exclude=".vscode/" --rsync-path="sudo rsync" \
+          ./ ${{ steps.source-env.outputs.SSH_USER }}@${{ steps.source-env.outputs.SSH_HOST }}:/var/www/${{ steps.source-env.outputs.DOMAIN_NAME }}
 
           # Sync the generated .env file
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no" \
-          --rsync-path="rsync" \
-          .env.generated ${{ steps.source-env.outputs.SSH_USER }}@${{ steps.source-env.outputs.SSH_HOST }}:/tmp/${{ steps.source-env.outputs.DOMAIN_NAME }}/.env
-
+          rsync -vz --no-perms --no-owner --no-group -e "ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no" \
+          --rsync-path="sudo rsync" \
+          .env.generated ${{ steps.source-env.outputs.SSH_USER }}@${{ steps.source-env.outputs.SSH_HOST }}:/var/www/${{ steps.source-env.outputs.DOMAIN_NAME }}/.env
       - name: SSH to Azure VM and run deployment commands
         run: |
-          set -a
-          source .env
-          set +a
-
           ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no ${{ steps.source-env.outputs.SSH_USER }}@${{ steps.source-env.outputs.SSH_HOST }} << EOF
-            sudo mv /tmp/${{ steps.source-env.outputs.DOMAIN_NAME }}/ /var/www/${{ steps.source-env.outputs.DOMAIN_NAME }}
             cd /var/www/${{ steps.source-env.outputs.DOMAIN_NAME }}
 
+            # Install dependencies
             npm install
+
+            # Restart or start the app with pm2
             pm2 restart agora-token-app || pm2 start index.js --name agora-token-app
           EOF
