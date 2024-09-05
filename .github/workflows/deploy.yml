@@ -20,6 +20,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Install Node.js 16.x
+        uses: actions/setup-node@v2
+        with:
+          node-version: "16"
+
+      - name: Install npm dependencies
+        run: |
+          npm ci
+
       - name: Install rsync
         run: |
           sudo apt-get update
@@ -38,8 +47,6 @@ jobs:
 
           SECRETS=$(curl -s -H "Content-Type: application/json" -X GET "$URL")
 
-          echo "Response from Azure Function: $SECRETS"
-
           if [ -z "$SECRETS" ]; then
               echo "Failed to retrieve secrets from Azure Function."
               exit 1
@@ -47,8 +54,6 @@ jobs:
 
           # Save the secrets directly to the .env file
           echo "$SECRETS" > .env
-
-          echo "Secrets fetched and saved to .env file."
 
       - name: Remove the 'Secret value ' from the .env file
         run: |
@@ -70,9 +75,6 @@ jobs:
           # Generate new .env file by replacing placeholders with actual values
           envsubst < .env.template > .env.generated
 
-          # Optional: output the generated .env for debugging
-          cat .env.generated
-
       - name: Source and decode SSH key
         id: source-env
         run: |
@@ -87,34 +89,36 @@ jobs:
           # Extract the public key from the private key
           ssh-keygen -y -f ~/.ssh/deploy_key_nrd > ~/.ssh/deploy_key_nrd.pub
 
-          # Output necessary variables
-          echo "::set-output name=SSH_KEY::$(cat ~/.ssh/deploy_key_nrd)"
-          echo "::set-output name=SSH_HOST::${SSH_HOST}"
-          echo "::set-output name=SSH_USER::${SSH_USER}"
-          echo "::set-output name=DOMAIN_NAME::${DOMAIN_NAME}"
+          # Set necessary environment variables using GITHUB_ENV instead of echoing
+          echo "SSH_HOST=${SSH_HOST}" >> $GITHUB_ENV
+          echo "SSH_USER=${SSH_USER}" >> $GITHUB_ENV
+          echo "DOMAIN_NAME=${DOMAIN_NAME}" >> $GITHUB_ENV
 
-      # Rsync the files to the server
-      - name: Rsync files to server
+      - name: Rsync files and node_modules to the server
         run: |
           set -a
           source .env
           set +a
 
+          # Rsync application files
           rsync -vz --no-perms --no-owner --no-group -e "ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no" \
           --exclude=".git/" --exclude=".github/" --exclude=".env" --exclude=".env.template" --exclude=".env.generated" --exclude=".vscode/" --rsync-path="sudo rsync" \
-          ./ ${{ steps.source-env.outputs.SSH_USER }}@${{ steps.source-env.outputs.SSH_HOST }}:/var/www/${{ steps.source-env.outputs.DOMAIN_NAME }}
+          ./ $SSH_USER@$SSH_HOST:/var/www/$DOMAIN_NAME
+
+          # Rsync node_modules to the server
+          rsync -vz --no-perms --no-owner --no-group -e "ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no" \
+          --rsync-path="sudo rsync" \
+          node_modules/ $SSH_USER@$SSH_HOST:/var/www/$DOMAIN_NAME/node_modules/
 
           # Sync the generated .env file
           rsync -vz --no-perms --no-owner --no-group -e "ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no" \
           --rsync-path="sudo rsync" \
-          .env.generated ${{ steps.source-env.outputs.SSH_USER }}@${{ steps.source-env.outputs.SSH_HOST }}:/var/www/${{ steps.source-env.outputs.DOMAIN_NAME }}/.env
+          .env.generated $SSH_USER@$SSH_HOST:/var/www/$DOMAIN_NAME/.env
+
       - name: SSH to Azure VM and run deployment commands
         run: |
-          ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no ${{ steps.source-env.outputs.SSH_USER }}@${{ steps.source-env.outputs.SSH_HOST }} << EOF
-            cd /var/www/${{ steps.source-env.outputs.DOMAIN_NAME }}
-
-            # Install dependencies
-            npm install
+          ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST << EOF
+            cd /var/www/$DOMAIN_NAME
 
             # Restart or start the app with pm2
             pm2 restart agora-token-app || pm2 start index.js --name agora-token-app
