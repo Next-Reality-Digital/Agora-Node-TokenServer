@@ -11,6 +11,18 @@ on:
         description: "Secret Name"
         required: true
         type: string
+      ssh_user:
+        description: "SSH User (optional)"
+        required: false
+        type: string
+      ssh_host:
+        description: "SSH Host (optional)"
+        required: false
+        type: string
+      ssh_key:
+        description: "SSH Private Key (base64-encoded, optional)"
+        required: false
+        type: string
 
 jobs:
   deploy-agora:
@@ -75,12 +87,47 @@ jobs:
           # Generate new .env file by replacing placeholders with actual values
           envsubst < .env.template > .env.generated
 
+      - name: Mask SSH Key
+        run: |
+          # Fetch the SSH key from input or secrets
+          SSH_KEY=$(jq -r '.inputs.ssh_key' $GITHUB_EVENT_PATH)
+
+          # Check if SSH_KEY is not empty
+          if [ -n "$SSH_KEY" ]; then
+            # Mask the SSH key to prevent it from showing in logs
+            echo ::add-mask::$SSH_KEY
+
+            # Store the SSH key in a GitHub Actions environment variable
+            echo SSH_KEY=$SSH_KEY >> $GITHUB_ENV
+          else
+            echo "No SSH key provided, skipping mask."
+          fi
+
       - name: Source and decode SSH key
         id: source-env
         run: |
           set -a
           source .env
           set +a
+
+          # Check if inputs were provided, otherwise fall back to .env.secrets
+          if [ -z "${{ github.event.inputs.ssh_user }}" ]; then
+            SSH_USER=$SSH_USER
+          else
+            SSH_USER="${{ github.event.inputs.ssh_user }}"
+          fi
+
+          if [ -z "${{ github.event.inputs.ssh_host }}" ]; then
+            SSH_HOST=$SSH_HOST
+          else
+            SSH_HOST="${{ github.event.inputs.ssh_host }}"
+          fi
+
+          if [ -z "${{ env.SSH_KEY }}" ]; then
+            SSH_KEY=$SSH_KEY
+          else
+            SSH_KEY="${{ env.SSH_KEY }}"
+          fi
 
           # Create the .ssh directory if it doesn't exist
           mkdir -p ~/.ssh
