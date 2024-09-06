@@ -82,6 +82,9 @@ jobs:
           source .env
           set +a
 
+          # Create the .ssh directory if it doesn't exist
+          mkdir -p ~/.ssh
+
           # Decode the base64 SSH key and ensure a new line at the end of the private key
           echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key_nrd
           chmod 600 ~/.ssh/deploy_key_nrd
@@ -118,6 +121,8 @@ jobs:
       - name: SSH to Azure VM and run deployment commands
         run: |
           ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST << EOF
+            sudo chown -R $SSH_USER:www-data /var/www/$DOMAIN_NAME
+            sudo chmod -R 755 /var/www/$DOMAIN_NAME
             cd /var/www/$DOMAIN_NAME
 
             # Restart or start the app with pm2
