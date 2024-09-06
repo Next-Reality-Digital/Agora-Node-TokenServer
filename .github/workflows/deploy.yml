@@ -121,9 +121,9 @@ jobs:
       - name: SSH to Azure VM and run deployment commands
         run: |
           ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST << EOF
-            sudo chown -R $SSH_USER:www-data /var/www/$DOMAIN_NAME
-            sudo chmod -R 755 /var/www/$DOMAIN_NAME
             cd /var/www/$DOMAIN_NAME
+            sudo chown -R $SSH_USER:www-data .
+            sudo chmod -R 755 .
 
             # Restart or start the app with pm2
             pm2 restart agora-token-app || pm2 start index.js --name agora-token-app
