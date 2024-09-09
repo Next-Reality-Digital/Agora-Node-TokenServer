@@ -64,8 +64,29 @@ jobs:
               exit 1
           fi
 
+          # Remove "Secret value: " from the response
+          SECRETS=$(echo "$SECRETS" | sed 's/^Secret value: //')
+
           # Save the secrets directly to the .env file
-          echo "$SECRETS" > .env
+          echo "$SECRETS" > .env.secrets
+
+          echo "Secrets fetched and saved to .env file."
+
+          GH_ACTIONS_URL="$AZURE_FUNCTION_URL?code=$AZURE_FUNCTION_CODE&key_vault_id=$KEY_VAULT_ID&name=github-actions"
+
+          # Get github-actions secrets
+          GH_ACTIONS_SECRETS=$(curl -s -H "Content-Type: application/json" -X GET "$GH_ACTIONS_URL")
+
+          if [ -z "$GH_ACTIONS_SECRETS" ]; then
+              echo "Failed to retrieve secrets from Azure Function."
+              exit 1
+          fi
+
+          # Remove "Secret value: " from the response
+          GH_ACTIONS_SECRETS=$(echo "$GH_ACTIONS_SECRETS" | sed 's/^Secret value: //')
+
+          # Save the secrets directly to the .env file
+          echo "$GH_ACTIONS_SECRETS" >> .env.secrets
 
       - name: Remove the 'Secret value ' from the .env file
         run: |
@@ -96,6 +117,8 @@ jobs:
           if [ -n "$SSH_KEY" ]; then
             # Mask the SSH key to prevent it from showing in logs
             echo ::add-mask::$SSH_KEY
+            echo ::add-mask::$SSH_USER
+            echo ::add-mask::$SSH_HOST
 
             # Store the SSH key in a GitHub Actions environment variable
             echo SSH_KEY=$SSH_KEY >> $GITHUB_ENV
@@ -133,16 +156,16 @@ jobs:
           mkdir -p ~/.ssh
 
           # Decode the base64 SSH key and ensure a new line at the end of the private key
-          echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key_nrd
+          echo "$AGORA_SSH_KEY" | base64 -d > ~/.ssh/deploy_key_nrd
           chmod 600 ~/.ssh/deploy_key_nrd
 
           # Extract the public key from the private key
           ssh-keygen -y -f ~/.ssh/deploy_key_nrd > ~/.ssh/deploy_key_nrd.pub
 
           # Set necessary environment variables using GITHUB_ENV instead of echoing
-          echo "SSH_HOST=${SSH_HOST}" >> $GITHUB_ENV
-          echo "SSH_USER=${SSH_USER}" >> $GITHUB_ENV
-          echo "DOMAIN_NAME=${DOMAIN_NAME}" >> $GITHUB_ENV
+          echo "SSH_HOST=${AGORA_SSH_HOST}" >> $GITHUB_ENV
+          echo "SSH_USER=${AGORA_SSH_USER}" >> $GITHUB_ENV
+          echo "DOMAIN_NAME=${AGORA_DOMAIN_NAME}" >> $GITHUB_ENV
 
       - name: Rsync files and node_modules to the server
         run: |
@@ -151,17 +174,17 @@ jobs:
           set +a
 
           # Rsync application files
-          rsync -vz --no-perms --no-owner --no-group -e "ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no" \
+          rsync -avz --no-perms --no-owner --no-group -e "ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no" \
           --exclude=".git/" --exclude=".github/" --exclude=".env" --exclude=".env.template" --exclude=".env.generated" --exclude=".vscode/" --rsync-path="sudo rsync" \
           ./ $SSH_USER@$SSH_HOST:/var/www/$DOMAIN_NAME
 
           # Rsync node_modules to the server
-          rsync -vz --no-perms --no-owner --no-group -e "ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no" \
+          rsync -avz --no-perms --no-owner --no-group -e "ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no" \
           --rsync-path="sudo rsync" \
           node_modules/ $SSH_USER@$SSH_HOST:/var/www/$DOMAIN_NAME/node_modules/
 
           # Sync the generated .env file
-          rsync -vz --no-perms --no-owner --no-group -e "ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no" \
+          rsync -avz --no-perms --no-owner --no-group -e "ssh -i ~/.ssh/deploy_key_nrd -o StrictHostKeyChecking=no" \
           --rsync-path="sudo rsync" \
           .env.generated $SSH_USER@$SSH_HOST:/var/www/$DOMAIN_NAME/.env
 
