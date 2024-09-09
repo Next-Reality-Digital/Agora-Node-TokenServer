@@ -68,7 +68,7 @@ jobs:
           SECRETS=$(echo "$SECRETS" | sed 's/^Secret value: //')
 
           # Save the secrets directly to the .env file
-          echo "$SECRETS" > .env.secrets
+          echo "$SECRETS" > .env
 
           echo "Secrets fetched and saved to .env file."
 
@@ -86,7 +86,7 @@ jobs:
           GH_ACTIONS_SECRETS=$(echo "$GH_ACTIONS_SECRETS" | sed 's/^Secret value: //')
 
           # Save the secrets directly to the .env file
-          echo "$GH_ACTIONS_SECRETS" >> .env.secrets
+          echo "$GH_ACTIONS_SECRETS" >> .env
 
       - name: Remove the 'Secret value ' from the .env file
         run: |
