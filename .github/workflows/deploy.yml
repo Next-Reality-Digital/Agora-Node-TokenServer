@@ -44,7 +44,8 @@ jobs:
       - name: Install rsync
         run: |
           sudo apt-get update
-          sudo apt-get install -y rsync gettext
+          sudo apt-get install -y gettext
+          sudo apt-get install -y rsync
 
       - name: Fetch Azure Function Secrets
         id: fetch-secrets
@@ -144,12 +145,6 @@ jobs:
             SSH_HOST=$SSH_HOST
           else
             SSH_HOST="${{ github.event.inputs.ssh_host }}"
-          fi
-
-          if [ -z "${{ env.SSH_KEY }}" ]; then
-            SSH_KEY=$SSH_KEY
-          else
-            SSH_KEY="${{ env.SSH_KEY }}"
           fi
 
           # Create the .ssh directory if it doesn't exist
