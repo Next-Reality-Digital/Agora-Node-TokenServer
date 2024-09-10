@@ -156,7 +156,7 @@ jobs:
           mkdir -p ~/.ssh
 
           # Decode the base64 SSH key and ensure a new line at the end of the private key
-          echo "$AGORA_SSH_KEY" | base64 -d > ~/.ssh/deploy_key_nrd
+          echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key_nrd
           chmod 600 ~/.ssh/deploy_key_nrd
 
           # Extract the public key from the private key
