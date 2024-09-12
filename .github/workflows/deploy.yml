@@ -11,22 +11,13 @@ on:
         description: "Secret Name"
         required: true
         type: string
-      ssh_user:
-        description: "SSH User (optional)"
-        required: false
-        type: string
-      ssh_host:
-        description: "SSH Host (optional)"
-        required: false
-        type: string
-      ssh_key:
-        description: "SSH Private Key (base64-encoded, optional)"
-        required: false
-        type: string
 
 jobs:
-  deploy-agora:
+  deploy-app:
     runs-on: ubuntu-latest
+
+    outputs:
+      domain_name: ${{ steps.determine-domain.outputs.domain_name }}
 
     steps:
       - name: Checkout repository
@@ -134,19 +125,6 @@ jobs:
           source .env
           set +a
 
-          # Check if inputs were provided, otherwise fall back to .env.secrets
-          if [ -z "${{ github.event.inputs.ssh_user }}" ]; then
-            SSH_USER=$SSH_USER
-          else
-            SSH_USER="${{ github.event.inputs.ssh_user }}"
-          fi
-
-          if [ -z "${{ github.event.inputs.ssh_host }}" ]; then
-            SSH_HOST=$SSH_HOST
-          else
-            SSH_HOST="${{ github.event.inputs.ssh_host }}"
-          fi
-
           # Create the .ssh directory if it doesn't exist
           mkdir -p ~/.ssh
 
@@ -161,6 +139,12 @@ jobs:
           echo "SSH_HOST=${AGORA_SSH_HOST}" >> $GITHUB_ENV
           echo "SSH_USER=${AGORA_SSH_USER}" >> $GITHUB_ENV
           echo "DOMAIN_NAME=${AGORA_DOMAIN_NAME}" >> $GITHUB_ENV
+
+      - name: Determine domain name
+        id: determine-domain
+        run: |
+          DOMAIN_NAME=$(echo $DOMAIN_NAME | sed 's/^https:\/\///')
+          echo "domain_name=$DOMAIN_NAME" >> $GITHUB_OUTPUT
 
       - name: Rsync files and node_modules to the server
         run: |
@@ -193,3 +177,114 @@ jobs:
             # Restart or start the app with pm2
             pm2 restart agora-token-app || pm2 start index.js --name agora-token-app
           EOF
+
+  notify:
+    name: Send notification
+    runs-on: ubuntu-latest
+    needs: [deploy-app]
+    env:
+      DOMAIN_NAME: ${{ needs.deploy-app.outputs.domain_name }}
+    steps:
+      - name: Notify slack channel
+        id: slack-message
+        uses: slackapi/slack-github-action@v1.24.0
+        if: success()
+        with:
+          channel-id: ${{ secrets.SLACK_NOTIFICATIONS_CHANNEL }}
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "✅ New service available! "
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Site Domain: `${{ env.DOMAIN_NAME }}`"
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Check out the build log"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Visit the changes live"
+                      },
+                      "url": "https://${{ env.DOMAIN_NAME }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_NOTIFICATIONS_TOKEN }}
+      - name: Notify slack channel on failure
+        id: slack-failure-message
+        uses: slackapi/slack-github-action@v1.24.0
+        if: failure()
+        with:
+          channel-id: ${{ secrets.SLACK_NOTIFICATIONS_CHANNEL }}
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "❌ Workflow failed!"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Site Domain: `${{ env.DOMAIN_NAME }}`"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Please check the workflow logs for more details."
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Logs"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_NOTIFICATIONS_TOKEN }}
