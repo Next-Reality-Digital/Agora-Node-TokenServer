@@ -176,6 +176,14 @@ jobs:
 
             # Restart or start the app with pm2
             pm2 restart agora-token-app || pm2 start index.js --name agora-token-app
+
+            if ! systemctl is-enabled pm2-$SSH_USER.service; then
+              # Configure PM2 to start on system boot
+              sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u $SSH_USER --hp /home/$SSH_USER
+
+              # Save the current PM2 process list for resurrection on reboot
+              pm2 save
+            fi
           EOF
 
   notify:
