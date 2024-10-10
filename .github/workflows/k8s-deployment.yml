@@ -1,4 +1,4 @@
-name: Deploy k8s
+name: Deploy Agora k8s
 
 on:
   workflow_dispatch:
@@ -89,6 +89,7 @@ jobs:
       - name: Export Kubeconfig and Mask Secrets -
         run: |
           set -a && source .env && set +a
+          mkdir -p ~/.kube
           echo "$KUBECONFIG" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
           echo "KUBECONFIG=$(cat ~/.kube/config)" >> $GITHUB_ENV
