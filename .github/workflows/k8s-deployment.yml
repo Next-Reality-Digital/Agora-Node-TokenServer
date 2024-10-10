@@ -86,14 +86,29 @@ jobs:
 
           echo "$GH_ACTIONS_SECRETS" >> .env
 
-      - name: Export Kubeconfig and Mask Secrets -
+      - name: Export Kubeconfig and Mask Secrets
         run: |
+          # Load environment variables
           set -a && source .env && set +a
+
+          # Ensure KUBECONFIG is set
+          if [ -z "$KUBECONFIG" ]; then
+            echo "Error: KUBECONFIG is missing."
+            exit 1
+          fi
+
+          # Decode and write kubeconfig to ~/.kube/config
           mkdir -p ~/.kube
           echo "$KUBECONFIG" | base64 -d > ~/.kube/config
+
+          # Ensure the kubeconfig file is properly formatted and readable
           chmod 600 ~/.kube/config
-          echo "KUBECONFIG=$(cat ~/.kube/config)" >> $GITHUB_ENV
-          echo ::add-mask::$KUBECONFIG
+
+          # Export the KUBECONFIG path to the environment for subsequent steps
+          echo "KUBECONFIG=~/.kube/config" >> $GITHUB_ENV
+
+          # Mask the KUBECONFIG content to avoid exposure in logs
+          echo ::add-mask::$(cat ~/.kube/config)
 
       - name: Create Kubernetes secret dynamically
         run: |
