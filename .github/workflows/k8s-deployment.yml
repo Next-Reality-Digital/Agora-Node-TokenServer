@@ -86,8 +86,11 @@ jobs:
 
       - name: Create or Update Kubernetes Secret Dynamically
         run: |
+          # Set the KUBECONFIG environment variable
+          export KUBECONFIG=/tmp/kubeconfig
+
           # Set the secret name from GitHub event inputs
-          SECRET_NAME="${{ github.event.inputs.secret_name }}"
+          SECRET_NAME="api-agora-secrets"
 
           # Parse variable names from .env.template
           VARIABLE_NAMES=($(grep -o '^[^=]*' .env.template))
@@ -112,8 +115,12 @@ jobs:
 
           # Create or update the Kubernetes secret
           kubectl create secret generic "$SECRET_NAME" $LITERAL_ARGS \
-            --kubeconfig /tmp/kubeconfig \
             --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy to Kubernetes with updated image
+        run: |
+          kubectl set image deployment/agora-node-token-server agora-node-token-server=nextrealitydigital.azurecr.io/agora-node-token-server:${{ github.sha }} \
+            --kubeconfig /tmp/kubeconfig
 
   notify:
     name: Send notification
