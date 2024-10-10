@@ -88,13 +88,13 @@ jobs:
           echo "$GH_ACTIONS_SECRETS" >> .env
 
           # Extract KUBECONFIG_CONTENT and save it as an environment variable
-          KUBECONFIG_CONTENT=$(echo "$GH_ACTIONS_SECRETS" | grep KUBECONFIG | cut -d'=' -f2-)
+          KUBECONFIG_CONTENT=$(echo "$GH_ACTIONS_SECRETS" | grep KUBECONFIG | cut -d'=' -f2- | base64 -d)
           echo "KUBECONFIG_CONTENT=$KUBECONFIG_CONTENT" >> $GITHUB_ENV
 
       - name: Write kubeconfig to file
         run: |
           # Decode the base64 encoded KUBECONFIG_CONTENT
-          echo "${{ env.KUBECONFIG_CONTENT }}" > /tmp/kubeconfig
+          echo "${{ env.KUBECONFIG_CONTENT }}"
           chmod 600 /tmp/kubeconfig
 
           # Log the /tmp/kubeconfig file
