@@ -94,7 +94,7 @@ jobs:
       - name: Write kubeconfig to file
         run: |
           # Decode the base64 encoded KUBECONFIG_CONTENT
-          echo "${{ env.KUBECONFIG_CONTENT }}" | base64 -d > /tmp/kubeconfig
+          echo "${{ env.KUBECONFIG_CONTENT }}" > /tmp/kubeconfig
           chmod 600 /tmp/kubeconfig
 
           # Log the /tmp/kubeconfig file
