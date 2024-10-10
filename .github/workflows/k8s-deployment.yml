@@ -90,7 +90,7 @@ jobs:
           export KUBECONFIG=/tmp/kubeconfig
 
           # Set the secret name from GitHub event inputs
-          SECRET_NAME="api-agora-secrets"
+          SECRET_NAME="${{ github.event.inputs.secret_name }}"
 
           # Parse variable names from .env.template
           VARIABLE_NAMES=($(grep -o '^[^=]*' .env.template))
@@ -119,7 +119,7 @@ jobs:
 
       - name: Deploy to Kubernetes with updated image
         run: |
-          kubectl set image deployment/agora-node-token-server agora-node-token-server=nextrealitydigital.azurecr.io/agora-node-token-server:${{ github.sha }} \
+          kubectl set image deployment/agora-node-token-server app=nextrealitydigital.azurecr.io/agora-node-token-server:${{ github.sha }} \
             --kubeconfig /tmp/kubeconfig
 
   notify:
