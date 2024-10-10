@@ -86,46 +86,34 @@ jobs:
 
           echo "$GH_ACTIONS_SECRETS" >> .env
 
-      - name: Export Kubeconfig and Mask Secrets
+          KUBECONFIG=$(echo "$GH_ACTIONS_SECRETS" | grep METAVERSE_KUBECONFIG | cut -d'=' -f2-)
+          echo "KUBECONFIG=$KUBECONFIG" >> $GITHUB_ENV
+
+      - name: Write kubeconfig to file
         run: |
-          # Load environment variables
-          set -a && source .env && set +a
+          # Decode the base64 encoded kubeconfig content
+          KUBECONFIG=$(echo "${{ env.KUBECONFIG }}" | base64 -d)
+          echo "$KUBECONFIG" > /tmp/kubeconfig
+          chmod 600 /tmp/kubeconfig
 
-          # Ensure KUBECONFIG is set
-          if [ -z "$KUBECONFIG" ]; then
-            echo "Error: KUBECONFIG is missing."
-            exit 1
-          fi
+          - name: Create Kubernetes secret dynamically
+          run: |
+            # Source the .env file to load environment variables
+            set -a && source .env && set +a
 
-          # Decode and write kubeconfig to ~/.kube/config
-          mkdir -p ~/.kube
-          echo "$KUBECONFIG" | base64 -d > ~/.kube/config
+            # Parse .env.template to extract the variable names
+            SECRET_NAME="${{ github.event.inputs.secret_name }}"
 
-          # Ensure the kubeconfig file is properly formatted and readable
-          chmod 600 ~/.kube/config
-
-          # Export the KUBECONFIG path to the environment for subsequent steps
-          echo "KUBECONFIG=~/.kube/config" >> $GITHUB_ENV
-
-          # Mask the KUBECONFIG content to avoid exposure in logs
-          echo ::add-mask::$(cat ~/.kube/config)
-
-      - name: Create Kubernetes secret dynamically
-        run: |
-          # Source the .env
-          set -a && source .env && set +a
-
-          # Parse .env.template to extract the variable names
-          SECRET_NAME="${{ github.event.inputs.secret_name }}"
-
-          # Create a kubectl command for creating the secret
-          kubectl create secret generic $SECRET_NAME \
-            $(awk -F= '/^.+=.*/ {print "--from-literal=" $1 "=${" $1 "}"}' .env.template) \
-            --dry-run=client -o yaml | kubectl apply -f -
+            # Dynamically create the Kubernetes secret using the values from the .env file
+            kubectl create secret generic $SECRET_NAME \
+              $(awk -F= '/^.+=.*/ {print "--from-literal=" $1 "=${" $1 "}"}' .env.template) \
+              --kubeconfig /tmp/kubeconfig \
+              --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to Kubernetes with updated image
         run: |
-          kubectl set image deployment/agora-node-token-server agora-node-token-server=nextrealitydigital.azurecr.io/agora-node-token-server:${{ github.sha }}
+          kubectl set image deployment/agora-node-token-server agora-node-token-server=nextrealitydigital.azurecr.io/agora-node-token-server:${{ github.sha }} \
+            --kubeconfig /tmp/kubeconfig
 
   notify:
     name: Send notification
