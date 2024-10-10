@@ -86,7 +86,8 @@ jobs:
           # Extract KUBECONFIG_CONTENT and save it as an environment variable
           KUBECONFIG_CONTENT=$(echo "$GH_ACTIONS_SECRETS" | grep KUBECONFIG | cut -d'=' -f2-)
           echo "KUBECONFIG_CONTENT=$KUBECONFIG_CONTENT" >> $GITHUB_ENV
-          echo "DOMAIN_NAME=${AGORA_DOMAIN_NAME}" >> $GITHUB_ENV
+          AGORA_DOMAIN_NAME=$(echo "$GH_ACTIONS_SECRETS" | grep AGORA_DOMAIN_NAME | cut -d'=' -f2-)
+          echo "DOMAIN_NAME=$AGORA_DOMAIN_NAME" >> $GITHUB_ENV
 
       - name: Determine domain name
         id: determine-domain
