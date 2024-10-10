@@ -85,6 +85,7 @@ jobs:
           chmod 600 /tmp/kubeconfig
           # Log the /tmp/kubeconfig file
           cat /tmp/kubeconfig
+
       - name: Create Kubernetes secret dynamically
         run: |
           # Get from the .env file the following variables:
@@ -97,12 +98,9 @@ jobs:
           kubectl create secret generic $SECRET_NAME \
             --from-literal=APP_ID=$APP_ID \
             --from-literal=APP_CERTIFICATE=$APP_CERTIFICATE \
-            --from-literal=PORT=$PORT
+            --from-literal=PORT=$PORT \
             --kubeconfig /tmp/kubeconfig
-      - name: Deploy to Kubernetes with updated image
-        run: |
-          kubectl set image deployment/agora-node-token-server agora-node-token-server=nextrealitydigital.azurecr.io/agora-node-token-server:${{ github.sha }} \
-            --kubeconfig /tmp/kubeconfig
+
   notify:
     name: Send notification
     runs-on: ubuntu-latest
