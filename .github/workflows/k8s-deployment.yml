@@ -83,39 +83,37 @@ jobs:
           # Decode the base64 encoded KUBECONFIG_CONTENT
           echo "${{ env.KUBECONFIG_CONTENT }}" | base64 -d > /tmp/kubeconfig
           chmod 600 /tmp/kubeconfig
-          # Log the /tmp/kubeconfig file
-          cat /tmp/kubeconfig
 
-          - name: Create or Update Kubernetes Secret Dynamically
-          run: |
-            # Set the secret name from GitHub event inputs
-            SECRET_NAME="${{ github.event.inputs.secret_name }}"
+      - name: Create or Update Kubernetes Secret Dynamically
+        run: |
+          # Set the secret name from GitHub event inputs
+          SECRET_NAME="${{ github.event.inputs.secret_name }}"
 
-            # Parse variable names from .env.template
-            VARIABLE_NAMES=($(grep -o '^[^=]*' .env.template))
+          # Parse variable names from .env.template
+          VARIABLE_NAMES=($(grep -o '^[^=]*' .env.template))
 
-            # Initialize a variable to hold --from-literal arguments
-            LITERAL_ARGS=""
+          # Initialize a variable to hold --from-literal arguments
+          LITERAL_ARGS=""
 
-            # Loop over each variable name to construct --from-literal arguments
-            for VAR_NAME in "${VARIABLE_NAMES[@]}"; do
-              # Fetch the corresponding value from the .env file
-              VAR_VALUE=$(grep "^$VAR_NAME=" .env | cut -d'=' -f2-)
+          # Loop over each variable name to construct --from-literal arguments
+          for VAR_NAME in "${VARIABLE_NAMES[@]}"; do
+            # Fetch the corresponding value from the .env file
+            VAR_VALUE=$(grep "^$VAR_NAME=" .env | cut -d'=' -f2-)
 
-              # Check if the value was found
-              if [ -z "$VAR_VALUE" ]; then
-                echo "Error: Value for $VAR_NAME not found in .env file."
-                exit 1
-              fi
+            # Check if the value was found
+            if [ -z "$VAR_VALUE" ]; then
+              echo "Error: Value for $VAR_NAME not found in .env file."
+              exit 1
+            fi
 
-              # Append the --from-literal argument
-              LITERAL_ARGS="$LITERAL_ARGS --from-literal=$VAR_NAME=$VAR_VALUE"
-            done
+            # Append the --from-literal argument
+            LITERAL_ARGS="$LITERAL_ARGS --from-literal=$VAR_NAME=$VAR_VALUE"
+          done
 
-            # Create or update the Kubernetes secret
-            kubectl create secret generic "$SECRET_NAME" $LITERAL_ARGS \
-              --kubeconfig /tmp/kubeconfig \
-              --dry-run=client -o yaml | kubectl apply -f -
+          # Create or update the Kubernetes secret
+          kubectl create secret generic "$SECRET_NAME" $LITERAL_ARGS \
+            --kubeconfig /tmp/kubeconfig \
+            --dry-run=client -o yaml | kubectl apply -f -
 
   notify:
     name: Send notification
