@@ -86,20 +86,36 @@ jobs:
           # Log the /tmp/kubeconfig file
           cat /tmp/kubeconfig
 
-      - name: Create Kubernetes secret dynamically
-        run: |
-          # Get from the .env file the following variables:
-          APP_ID=$(grep APP_ID .env | cut -d'=' -f2-)
-          APP_CERTIFICATE=$(grep APP_CERTIFICATE .env | cut -d'=' -f2-)
-          PORT=$(grep PORT .env | cut -d'=' -f2-)
-          # Parse .env.template to extract the variable names
-          SECRET_NAME="${{ github.event.inputs.secret_name }}"
-          # Dynamically create the Kubernetes secret using the values from the .env file
-          kubectl create secret generic $SECRET_NAME \
-            --from-literal=APP_ID=$APP_ID \
-            --from-literal=APP_CERTIFICATE=$APP_CERTIFICATE \
-            --from-literal=PORT=$PORT \
-            --kubeconfig /tmp/kubeconfig
+          - name: Create or Update Kubernetes Secret Dynamically
+          run: |
+            # Set the secret name from GitHub event inputs
+            SECRET_NAME="${{ github.event.inputs.secret_name }}"
+
+            # Parse variable names from .env.template
+            VARIABLE_NAMES=($(grep -o '^[^=]*' .env.template))
+
+            # Initialize a variable to hold --from-literal arguments
+            LITERAL_ARGS=""
+
+            # Loop over each variable name to construct --from-literal arguments
+            for VAR_NAME in "${VARIABLE_NAMES[@]}"; do
+              # Fetch the corresponding value from the .env file
+              VAR_VALUE=$(grep "^$VAR_NAME=" .env | cut -d'=' -f2-)
+
+              # Check if the value was found
+              if [ -z "$VAR_VALUE" ]; then
+                echo "Error: Value for $VAR_NAME not found in .env file."
+                exit 1
+              fi
+
+              # Append the --from-literal argument
+              LITERAL_ARGS="$LITERAL_ARGS --from-literal=$VAR_NAME=$VAR_VALUE"
+            done
+
+            # Create or update the Kubernetes secret
+            kubectl create secret generic "$SECRET_NAME" $LITERAL_ARGS \
+              --kubeconfig /tmp/kubeconfig \
+              --dry-run=client -o yaml | kubectl apply -f -
 
   notify:
     name: Send notification
@@ -139,15 +155,73 @@ jobs:
                   "elements": [
                     {
                       "type": "button",
-                      "text": "Check out the build log",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Check out the build log"
+                      },
                       "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                     }
                   ]
                 },
                 {
-                  "type": "button",
-                  "text": "Visit the changes live",
-                  "url": "https://${{ env.DOMAIN_NAME }}"
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Visit the changes live"
+                      },
+                      "url": "https://${{ env.DOMAIN_NAME }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_NOTIFICATIONS_TOKEN }}
+      - name: Notify slack channel on failure
+        id: slack-failure-message
+        uses: slackapi/slack-github-action@v1.24.0
+        if: failure()
+        with:
+          channel-id: ${{ secrets.SLACK_NOTIFICATIONS_CHANNEL }}
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "❌ Workflow failed!"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Site Domain: `${{ env.DOMAIN_NAME }}`"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Please check the workflow logs for more details."
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Logs"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
                 }
               ]
             }
