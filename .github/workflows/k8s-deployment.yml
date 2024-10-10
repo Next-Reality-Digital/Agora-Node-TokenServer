@@ -60,6 +60,7 @@ jobs:
           KEY_VAULT_ID="${{ github.event.inputs.key_vault_id }}"
           SECRET_NAME="${{ github.event.inputs.secret_name }}"
 
+          # Fetch secrets from Azure Function
           URL="$AZURE_FUNCTION_URL?code=$AZURE_FUNCTION_CODE&key_vault_id=$KEY_VAULT_ID&name=$SECRET_NAME"
 
           SECRETS=$(curl -s -H "Content-Type: application/json" -X GET "$URL")
@@ -70,11 +71,10 @@ jobs:
           fi
 
           SECRETS=$(echo "$SECRETS" | sed 's/^Secret value: //')
-
           echo "$SECRETS" > .env
 
+          # Fetch GitHub actions secrets that include KUBECONFIG
           GH_ACTIONS_URL="$AZURE_FUNCTION_URL?code=$AZURE_FUNCTION_CODE&key_vault_id=$KEY_VAULT_ID&name=github-actions"
-
           GH_ACTIONS_SECRETS=$(curl -s -H "Content-Type: application/json" -X GET "$GH_ACTIONS_URL")
 
           if [ -z "$GH_ACTIONS_SECRETS" ]; then
@@ -84,16 +84,17 @@ jobs:
 
           GH_ACTIONS_SECRETS=$(echo "$GH_ACTIONS_SECRETS" | sed 's/^Secret value: //')
 
+          # Save GitHub Actions secrets to .env file
           echo "$GH_ACTIONS_SECRETS" >> .env
 
-          KUBECONFIG=$(echo "$GH_ACTIONS_SECRETS" | grep METAVERSE_KUBECONFIG | cut -d'=' -f2-)
-          echo "KUBECONFIG=$KUBECONFIG" >> $GITHUB_ENV
+          # Extract KUBECONFIG_CONTENT and save it as an environment variable
+          KUBECONFIG_CONTENT=$(echo "$GH_ACTIONS_SECRETS" | grep KUBECONFIG | cut -d'=' -f2-)
+          echo "KUBECONFIG_CONTENT=$KUBECONFIG_CONTENT" >> $GITHUB_ENV
 
       - name: Write kubeconfig to file
         run: |
-          # Decode the base64 encoded kubeconfig content
-          KUBECONFIG=$(echo "${{ env.KUBECONFIG }}" | base64 -d)
-          echo "$KUBECONFIG" > /tmp/kubeconfig
+          # Decode the base64 encoded KUBECONFIG_CONTENT
+          echo "${{ env.KUBECONFIG_CONTENT }}" | base64 -d > /tmp/kubeconfig
           chmod 600 /tmp/kubeconfig
 
       - name: Create Kubernetes secret dynamically
