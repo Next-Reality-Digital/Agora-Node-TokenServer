@@ -97,10 +97,15 @@ jobs:
           echo "${{ env.KUBECONFIG_CONTENT }}" | base64 -d > /tmp/kubeconfig
           chmod 600 /tmp/kubeconfig
 
+          # Log the /tmp/kubeconfig file
+          cat /tmp/kubeconfig
+
       - name: Create Kubernetes secret dynamically
         run: |
-          # Source the .env file to load environment variables
-          set -a && source .env && set +a
+          # Get from the .env file the following variables:
+          APP_ID=$(grep APP_ID .env | cut -d'=' -f2-)
+          APP_CERTIFICATE=$(grep APP_CERTIFICATE .env | cut -d'=' -f2-)
+          PORT=$(grep PORT .env | cut -d'=' -f2-)
 
           # Parse .env.template to extract the variable names
           SECRET_NAME="${{ github.event.inputs.secret_name }}"
