@@ -91,6 +91,19 @@ jobs:
           set -a && source .env && set +a
           echo "KUBECONFIG=$KUBECONFIG" >> $GITHUB_ENV
 
+      - name: Create Kubernetes secret dynamically
+        run: |
+          # Source the .env
+          set -a && source .env && set +a
+
+          # Parse .env.template to extract the variable names
+          SECRET_NAME="${{ github.event.inputs.secret_name }}"
+
+          # Create a kubectl command for creating the secret
+          kubectl create secret generic $SECRET_NAME \
+            $(awk -F= '/^.+=.*/ {print "--from-literal=" $1 "=${" $1 "}"}' .env.template) \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Set up kubeconfig from .env
         run: |
           # Ensure kubeconfig is set from the generated .env file
