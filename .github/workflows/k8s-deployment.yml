@@ -89,7 +89,10 @@ jobs:
       - name: Export Kubeconfig and Mask Secrets -
         run: |
           set -a && source .env && set +a
-          echo "KUBECONFIG=$KUBECONFIG" >> $GITHUB_ENV
+          echo "$KUBECONFIG" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+          echo "KUBECONFIG=$(cat ~/.kube/config)" >> $GITHUB_ENV
+          echo ::add-mask::$KUBECONFIG
 
       - name: Create Kubernetes secret dynamically
         run: |
@@ -103,20 +106,6 @@ jobs:
           kubectl create secret generic $SECRET_NAME \
             $(awk -F= '/^.+=.*/ {print "--from-literal=" $1 "=${" $1 "}"}' .env.template) \
             --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: Set up kubeconfig from .env
-        run: |
-          # Ensure kubeconfig is set from the generated .env file
-          if [ -z "$KUBECONFIG" ]; then
-            echo "KUBECONFIG is missing from .env"
-            exit 1
-          fi
-
-          # Create kubeconfig file from environment variable
-          mkdir -p ~/.kube
-          # Base64 decode the kubeconfig
-          echo "$KUBECONFIG" | base64 -d > ~/.kube/config
-          chmod 600 ~/.kube/config
 
       - name: Deploy to Kubernetes with updated image
         run: |
