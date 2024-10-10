@@ -49,6 +49,7 @@ jobs:
         run: |
           docker push nextrealitydigital.azurecr.io/agora-node-token-server:latest
           docker push nextrealitydigital.azurecr.io/agora-node-token-server:${{ github.sha }}
+
       - name: Fetch Azure Function Secrets
         id: fetch-secrets
         run: |
@@ -56,6 +57,7 @@ jobs:
           AZURE_FUNCTION_CODE="${{ secrets.AZURE_FUNCTION_CODE }}"
           KEY_VAULT_ID="${{ github.event.inputs.key_vault_id }}"
           SECRET_NAME="${{ github.event.inputs.secret_name }}"
+
           # Fetch secrets from Azure Function
           URL="$AZURE_FUNCTION_URL?code=$AZURE_FUNCTION_CODE&key_vault_id=$KEY_VAULT_ID&name=$SECRET_NAME"
           SECRETS=$(curl -s -H "Content-Type: application/json" -X GET "$URL")
@@ -63,21 +65,35 @@ jobs:
               echo "Failed to retrieve secrets from Azure Function."
               exit 1
           fi
+
           SECRETS=$(echo "$SECRETS" | sed 's/^Secret value: //')
           echo "$SECRETS" > .env
+
           # Fetch GitHub actions secrets that include KUBECONFIG
           GH_ACTIONS_URL="$AZURE_FUNCTION_URL?code=$AZURE_FUNCTION_CODE&key_vault_id=$KEY_VAULT_ID&name=github-actions"
           GH_ACTIONS_SECRETS=$(curl -s -H "Content-Type: application/json" -X GET "$GH_ACTIONS_URL")
+
           if [ -z "$GH_ACTIONS_SECRETS" ]; then
               echo "Failed to retrieve secrets from Azure Function."
               exit 1
           fi
+
           GH_ACTIONS_SECRETS=$(echo "$GH_ACTIONS_SECRETS" | sed 's/^Secret value: //')
+
           # Save GitHub Actions secrets to .env file
           echo "$GH_ACTIONS_SECRETS" >> .env
+
           # Extract KUBECONFIG_CONTENT and save it as an environment variable
           KUBECONFIG_CONTENT=$(echo "$GH_ACTIONS_SECRETS" | grep KUBECONFIG | cut -d'=' -f2-)
           echo "KUBECONFIG_CONTENT=$KUBECONFIG_CONTENT" >> $GITHUB_ENV
+          echo "DOMAIN_NAME=${AGORA_DOMAIN_NAME}" >> $GITHUB_ENV
+
+      - name: Determine domain name
+        id: determine-domain
+        run: |
+          DOMAIN_NAME=$(echo $DOMAIN_NAME | sed 's/^https:\/\///')
+          echo "domain_name=$DOMAIN_NAME" >> $GITHUB_OUTPUT
+
       - name: Write kubeconfig to file
         run: |
           # Decode the base64 encoded KUBECONFIG_CONTENT
@@ -185,6 +201,7 @@ jobs:
             }
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_NOTIFICATIONS_TOKEN }}
+
       - name: Notify slack channel on failure
         id: slack-failure-message
         uses: slackapi/slack-github-action@v1.24.0
