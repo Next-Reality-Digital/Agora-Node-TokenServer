@@ -96,19 +96,19 @@ jobs:
           echo "$KUBECONFIG" > /tmp/kubeconfig
           chmod 600 /tmp/kubeconfig
 
-          - name: Create Kubernetes secret dynamically
-          run: |
-            # Source the .env file to load environment variables
-            set -a && source .env && set +a
+      - name: Create Kubernetes secret dynamically
+        run: |
+          # Source the .env file to load environment variables
+          set -a && source .env && set +a
 
-            # Parse .env.template to extract the variable names
-            SECRET_NAME="${{ github.event.inputs.secret_name }}"
+          # Parse .env.template to extract the variable names
+          SECRET_NAME="${{ github.event.inputs.secret_name }}"
 
-            # Dynamically create the Kubernetes secret using the values from the .env file
-            kubectl create secret generic $SECRET_NAME \
-              $(awk -F= '/^.+=.*/ {print "--from-literal=" $1 "=${" $1 "}"}' .env.template) \
-              --kubeconfig /tmp/kubeconfig \
-              --dry-run=client -o yaml | kubectl apply -f -
+          # Dynamically create the Kubernetes secret using the values from the .env file
+          kubectl create secret generic $SECRET_NAME \
+            $(awk -F= '/^.+=.*/ {print "--from-literal=" $1 "=${" $1 "}"}' .env.template) \
+            --kubeconfig /tmp/kubeconfig \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to Kubernetes with updated image
         run: |
