@@ -107,9 +107,10 @@ jobs:
 
           # Dynamically create the Kubernetes secret using the values from the .env file
           kubectl create secret generic $SECRET_NAME \
-            $(awk -F= '/^.+=.*/ {print "--from-literal=" $1 "=${" $1 "}"}' .env.template) \
-            --kubeconfig /tmp/kubeconfig \
-            --dry-run=client -o yaml | kubectl apply -f -
+            --from-literal=APP_ID=$APP_ID \
+            --from-literal=APP_CERTIFICATE=$APP_CERTIFICATE \
+            --from-literal=PORT=$PORT
+            --kubeconfig /tmp/kubeconfig
 
       - name: Deploy to Kubernetes with updated image
         run: |
