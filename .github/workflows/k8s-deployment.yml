@@ -137,6 +137,7 @@ jobs:
       - name: Deploy to Kubernetes with updated image
         run: |
           export KUBECONFIG=/tmp/kubeconfig
+          SECRET_NAME="${{ github.event.inputs.secret_name }}"
 
           kubectl set image deployment/agora-node-token-server app=nextrealitydigital.azurecr.io/agora-node-token-server:${{ github.sha }}
 
