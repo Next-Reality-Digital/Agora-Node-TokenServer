@@ -143,11 +143,12 @@ jobs:
 
       - name: Deploy to Kubernetes with updated image
         run: |
+          export KUBECONFIG=/tmp/kubeconfig
+
           kubectl set image deployment/agora-node-token-server app=nextrealitydigital.azurecr.io/agora-node-token-server:${{ github.sha }} \
-            --kubeconfig /tmp/kubeconfig
 
           # Update the deployment to use the secrets for environment variables
-          kubectl patch deployment agora-node-token-server --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/env", "value": '$ENV_PATCH'}]'
+          kubectl patch deployment agora-node-token-server --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/env", "value": '$ENV_PATCH'}]' \
 
   notify:
     name: Send notification
