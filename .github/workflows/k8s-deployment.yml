@@ -114,9 +114,8 @@ jobs:
 
           # Initialize a variable to hold --from-literal arguments
           LITERAL_ARGS=""
-          ENV_PATCH='['
 
-          # Loop over each variable name to construct --from-literal arguments and patch
+          # Loop over each variable name to construct --from-literal arguments
           for VAR_NAME in "${VARIABLE_NAMES[@]}"; do
             # Fetch the corresponding value from the .env file
             VAR_VALUE=$(grep "^$VAR_NAME=" .env | cut -d'=' -f2-)
@@ -129,13 +128,7 @@ jobs:
 
             # Append the --from-literal argument
             LITERAL_ARGS="$LITERAL_ARGS --from-literal=$VAR_NAME=$VAR_VALUE"
-
-            # Construct the JSON for patching
-            ENV_PATCH+='{"name": "'$VAR_NAME'", "valueFrom": {"secretKeyRef": {"name": "'$SECRET_NAME'", "key": "'$VAR_NAME'"}}},'
           done
-
-          # Remove the trailing comma and close the JSON array
-          ENV_PATCH=${ENV_PATCH%,}] 
 
           # Create or update the Kubernetes secret
           kubectl create secret generic "$SECRET_NAME" $LITERAL_ARGS \
@@ -147,8 +140,7 @@ jobs:
 
           kubectl set image deployment/agora-node-token-server app=nextrealitydigital.azurecr.io/agora-node-token-server:${{ github.sha }}
 
-          # Update the deployment to use the secrets for environment variables
-          kubectl patch deployment agora-node-token-server --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/env", "value": '$ENV_PATCH'}]'
+          kubectl set env --from=secret/$SECRET_NAME deployment/agora-node-token-server
 
   notify:
     name: Send notification
