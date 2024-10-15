@@ -91,7 +91,6 @@ jobs:
       
           # Extract KUBECONFIG content using awk
           awk '
-            BEGIN { flag=0; }
             /^KUBECONFIG=/ {
               # Remove "KUBECONFIG=" and start capturing
               sub(/^KUBECONFIG=/, "")
