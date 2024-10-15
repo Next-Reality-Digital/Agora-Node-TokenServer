@@ -87,7 +87,7 @@ jobs:
       
           # Debug: Verify the format of .env (excluding sensitive data)
           echo "Combined .env file:"
-          grep -v 'KUBECONFIG' .env
+          cat .env
       
           # Extract KUBECONFIG content using awk
           awk '
