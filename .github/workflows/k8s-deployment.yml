@@ -53,40 +53,43 @@ jobs:
       - name: Fetch Azure Function Secrets
         id: fetch-secrets
         run: |
+          set -e  # Exit immediately if a command exits with a non-zero status
+      
           AZURE_FUNCTION_URL="${{ secrets.AZURE_FUNCTION_URL }}"
           AZURE_FUNCTION_CODE="${{ secrets.AZURE_FUNCTION_CODE }}"
           KEY_VAULT_ID="${{ github.event.inputs.key_vault_id }}"
           SECRET_NAME="${{ github.event.inputs.secret_name }}"
       
-          # Fetch secrets from Azure Function
-          URL="$AZURE_FUNCTION_URL?code=$AZURE_FUNCTION_CODE&key_vault_id=$KEY_VAULT_ID&name=$SECRET_NAME"
-          SECRETS=$(curl -s -H "Content-Type: application/json" -X GET "$URL")
+          # Function to fetch secrets from Azure Function
+          fetch_secret() {
+            local name=$1
+            curl -s -H "Content-Type: application/json" -X GET "$AZURE_FUNCTION_URL?code=$AZURE_FUNCTION_CODE&key_vault_id=$KEY_VAULT_ID&name=$name" | sed 's/^Secret value: //; s/: /=/g'
+          }
+      
+          # Fetch main secrets
+          SECRETS=$(fetch_secret "$SECRET_NAME")
           if [ -z "$SECRETS" ]; then
-              echo "Failed to retrieve secrets from Azure Function."
+              echo "Failed to retrieve secrets for $SECRET_NAME from Azure Function."
               exit 1
           fi
-          
-          SECRETS=$(echo "$SECRETS" | sed 's/^Secret value: //')
           echo "$SECRETS" > secrets.env
-          
-          # Fetch GitHub actions secrets that include KUBECONFIG
-          GH_ACTIONS_URL="$AZURE_FUNCTION_URL?code=$AZURE_FUNCTION_CODE&key_vault_id=$KEY_VAULT_ID&name=github-actions"
-          GH_ACTIONS_SECRETS=$(curl -s -H "Content-Type: application/json" -X GET "$GH_ACTIONS_URL")
-          
+      
+          # Fetch GitHub Actions secrets that include KUBECONFIG
+          GH_ACTIONS_SECRETS=$(fetch_secret "github-actions")
           if [ -z "$GH_ACTIONS_SECRETS" ]; then
               echo "Failed to retrieve GitHub Actions secrets from Azure Function."
               exit 1
           fi
-          
-          GH_ACTIONS_SECRETS=$(echo "$GH_ACTIONS_SECRETS" | sed 's/^Secret value: //')
-          
-          # Save GitHub Actions secrets to a temporary file
           echo "$GH_ACTIONS_SECRETS" > github_actions_secrets.env
-          
-          # Combine all secrets into .env
+      
+          # Combine all secrets into a single .env file
           cat secrets.env github_actions_secrets.env > .env
       
-          # Extract KUBECONFIG content
+          # Debug: Verify the format of .env (excluding sensitive data)
+          echo "Combined .env file:"
+          grep -v 'KUBECONFIG' .env
+      
+          # Extract KUBECONFIG content using awk
           KUBECONFIG_CONTENT=$(awk '
             BEGIN { flag=0; }
             /^KUBECONFIG=/ {
@@ -108,34 +111,31 @@ jobs:
               print config 
             }
           ' .env)
-          
+      
+          # Verify that KUBECONFIG_CONTENT was extracted correctly
+          if [ -z "$KUBECONFIG_CONTENT" ]; then
+            echo "KUBECONFIG_CONTENT is empty. Check the .env file format."
+            exit 1
+          fi
+      
           # Replace actual newlines with escaped newlines for environment variable
           KUBECONFIG_ESCAPED=$(echo "$KUBECONFIG_CONTENT" | awk '{printf "%s\\n", $0}')
-          
+      
           # Export KUBECONFIG_CONTENT to GITHUB_ENV
           echo "KUBECONFIG_CONTENT=\"${KUBECONFIG_ESCAPED}\"" >> $GITHUB_ENV
       
-          # Extract and export other variables
-          VARIABLE1=$(grep '^VARIABLE1=' .env | cut -d'=' -f2-)
-          echo "VARIABLE1=${VARIABLE1}" >> $GITHUB_ENV
-      
-          API_TOKEN=$(grep '^API_TOKEN=' .env | cut -d'=' -f2-)
-          echo "API_TOKEN=${API_TOKEN}" >> $GITHUB_ENV
-      
           AGORA_DOMAIN_NAME=$(grep '^AGORA_DOMAIN_NAME=' .env | cut -d'=' -f2-)
           echo "DOMAIN_NAME=${AGORA_DOMAIN_NAME}" >> $GITHUB_ENV
+      
+          # Reconstruct the kubeconfig file
+          echo -e "$KUBECONFIG_CONTENT" > /tmp/kubeconfig
+          chmod 600 /tmp/kubeconfig
       
       - name: Determine domain name
         id: determine-domain
         run: |
           DOMAIN_NAME=$(echo $DOMAIN_NAME | sed 's/^https:\/\///')
           echo "domain_name=$DOMAIN_NAME" >> $GITHUB_OUTPUT
-
-      - name: Write kubeconfig to file
-        run: |
-          # Decode the base64 encoded KUBECONFIG_CONTENT
-          echo -e "${{ env.KUBECONFIG_CONTENT }}" > /tmp/kubeconfig
-          chmod 600 /tmp/kubeconfig
 
       - name: Create or Update Kubernetes Secret Dynamically
         run: |
