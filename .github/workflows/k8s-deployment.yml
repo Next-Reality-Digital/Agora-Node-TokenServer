@@ -65,28 +65,31 @@ jobs:
               echo "Failed to retrieve secrets from Azure Function."
               exit 1
           fi
-
+          
           SECRETS=$(echo "$SECRETS" | sed 's/^Secret value: //')
           echo "$SECRETS" > .env
-
+          
           # Fetch GitHub actions secrets that include KUBECONFIG
           GH_ACTIONS_URL="$AZURE_FUNCTION_URL?code=$AZURE_FUNCTION_CODE&key_vault_id=$KEY_VAULT_ID&name=github-actions"
           GH_ACTIONS_SECRETS=$(curl -s -H "Content-Type: application/json" -X GET "$GH_ACTIONS_URL")
-
+          
           if [ -z "$GH_ACTIONS_SECRETS" ]; then
-              echo "Failed to retrieve secrets from Azure Function."
+              echo "Failed to retrieve GitHub Actions secrets from Azure Function."
               exit 1
           fi
-
+          
           GH_ACTIONS_SECRETS=$(echo "$GH_ACTIONS_SECRETS" | sed 's/^Secret value: //')
-
+          
           # Save GitHub Actions secrets to .env file
           echo "$GH_ACTIONS_SECRETS" >> .env
-
+          
           # Extract KUBECONFIG_CONTENT and save it as an environment variable
-          KUBECONFIG_CONTENT=$(echo "$GH_ACTIONS_SECRETS" | grep KUBECONFIG | cut -d'=' -f2-)
-          echo "KUBECONFIG_CONTENT=$KUBECONFIG_CONTENT" >> $GITHUB_ENV
-          AGORA_DOMAIN_NAME=$(echo "$GH_ACTIONS_SECRETS" | grep AGORA_DOMAIN_NAME | cut -d'=' -f2-)
+          KUBECONFIG_CONTENT=$(echo "$GH_ACTIONS_SECRETS" | grep '^KUBECONFIG=' | cut -d'=' -f2-)
+          echo "KUBECONFIG_CONTENT<<EOF" >> $GITHUB_ENV
+          echo "$KUBECONFIG_CONTENT" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          
+          AGORA_DOMAIN_NAME=$(echo "$GH_ACTIONS_SECRETS" | grep '^AGORA_DOMAIN_NAME=' | cut -d'=' -f2-)
           echo "DOMAIN_NAME=$AGORA_DOMAIN_NAME" >> $GITHUB_ENV
 
       - name: Determine domain name
