@@ -134,7 +134,7 @@ jobs:
       - name: Write kubeconfig to file
         run: |
           # Decode the base64 encoded KUBECONFIG_CONTENT
-          echo -e "${{ env.KUBECONFIG_CONTENT }}" | base64 --decode | gunzip > /tmp/kubeconfig
+          echo -e "${{ env.KUBECONFIG_CONTENT }}" > /tmp/kubeconfig
           chmod 600 /tmp/kubeconfig
 
       - name: Create or Update Kubernetes Secret Dynamically
