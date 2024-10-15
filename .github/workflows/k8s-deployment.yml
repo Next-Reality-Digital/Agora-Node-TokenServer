@@ -90,12 +90,12 @@ jobs:
           grep -v 'KUBECONFIG' .env
       
           # Extract KUBECONFIG content using awk
-          KUBECONFIG_CONTENT=$(awk '
+          awk '
             BEGIN { flag=0; }
             /^KUBECONFIG=/ {
               # Remove "KUBECONFIG=" and start capturing
               sub(/^KUBECONFIG=/, "")
-              config = $0
+              print $0
               flag = 1
               next
             }
@@ -104,32 +104,25 @@ jobs:
               flag = 0 
             }
             flag {
-              # Append each line with an actual newline
-              config = config "\n" $0
+              # Print each line as is
+              print $0
             }
-            END { 
-              print config 
-            }
-          ' .env)
-      
-          # Verify that KUBECONFIG_CONTENT was extracted correctly
-          if [ -z "$KUBECONFIG_CONTENT" ]; then
-            echo "KUBECONFIG_CONTENT is empty. Check the .env file format."
+          ' .env > /tmp/kubeconfig
+
+          # Verify that /tmp/kubeconfig is not empty
+          if [ ! -s /tmp/kubeconfig ]; then
+            echo "kubeconfig file is empty. Check the extraction process."
             exit 1
           fi
-      
-          # Replace actual newlines with escaped newlines for environment variable
-          KUBECONFIG_ESCAPED=$(echo "$KUBECONFIG_CONTENT" | awk '{printf "%s\\n", $0}')
-      
-          # Export KUBECONFIG_CONTENT to GITHUB_ENV
-          echo "KUBECONFIG_CONTENT=\"${KUBECONFIG_ESCAPED}\"" >> $GITHUB_ENV
+
+          # Set proper permissions
+          chmod 600 /tmp/kubeconfig
+
+          # Export KUBECONFIG environment variable for subsequent steps
+          echo "KUBECONFIG=/tmp/kubeconfig" >> $GITHUB_ENV
       
           AGORA_DOMAIN_NAME=$(grep '^AGORA_DOMAIN_NAME=' .env | cut -d'=' -f2-)
           echo "DOMAIN_NAME=${AGORA_DOMAIN_NAME}" >> $GITHUB_ENV
-      
-          # Reconstruct the kubeconfig file
-          echo -e "$KUBECONFIG_CONTENT" > /tmp/kubeconfig
-          chmod 600 /tmp/kubeconfig
       
       - name: Determine domain name
         id: determine-domain
