@@ -18,6 +18,11 @@ on:
         required: true
         type: string
         default: "metaverse"
+      metaverse_namespace:
+        description: "Metaverse namespace"
+        required: true
+        type: string
+        default: "metaverse"
       image_tag:
         type: choice
         options:
@@ -86,7 +91,7 @@ jobs:
           propagate_failure: true
           trigger_workflow: true
           wait_workflow: true
-          client_payload: '{"image_tag": "${{ github.sha }}", "key_vault_id": "${{ github.event.inputs.key_vault_id }}", "secret_name": "${{ github.event.inputs.secret_name }}", "app_to_deploy": "agora-token-server", "release_name": "${{ github.event.inputs.release_name }}"}'
+          client_payload: '{"image_tag": "${{ github.sha }}", "key_vault_id": "${{ github.event.inputs.key_vault_id }}", "secret_name": "${{ github.event.inputs.secret_name }}", "app_to_deploy": "agora-token-server", "release_name": "${{ github.event.inputs.release_name }}", "metaverse_namespace": "${{ github.event.inputs.metaverse_namespace }}"}'
 
   tigger_dev_workflow:
     if: github.event_name == 'push'
@@ -105,4 +110,4 @@ jobs:
           propagate_failure: true
           trigger_workflow: true
           wait_workflow: true
-          client_payload: '{"image_tag": "${{ github.sha }}", "key_vault_id": "qa-metaverse", "secret_name": "api-agora-secrets", "app_to_deploy": "agora-token-server", "release_name": "metaverse"}'
+          client_payload: '{"image_tag": "${{ github.sha }}", "key_vault_id": "qa-metaverse", "secret_name": "api-agora-secrets", "app_to_deploy": "agora-token-server", "release_name": "metaverse", "metaverse_namespace": "metaverse"}'
