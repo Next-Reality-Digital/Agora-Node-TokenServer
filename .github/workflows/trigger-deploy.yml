@@ -33,10 +33,20 @@ on:
         description: "Branch to deploy"
         required: true
         default: "main"
+      registry:
+        type: string
+        description: "Azure Container Registry URL"
+        required: true
+        default: "nextrealitydigital.azurecr.io"
+      image_name:
+        type: string
+        description: "Docker image name"
+        required: true
+        default: "agora-node-token-server"
 
 env:
-  REGISTRY: nextrealitydigital.azurecr.io
-  IMAGE_NAME: agora-node-token-server
+  REGISTRY: ${{ github.event.inputs.registry || 'nextrealitydigital.azurecr.io' }}
+  IMAGE_NAME: ${{ github.event.inputs.image_name || 'agora-node-token-server' }}
 
 jobs:
   trigger_workflow:
