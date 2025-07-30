@@ -74,37 +74,23 @@ jobs:
           echo "Raw response from Azure Function:"
           echo "$GH_ACTIONS_RESPONSE"
           
-          # Try to extract JSON from response (handles both raw JSON and "Secret value: {...}" format)
-          if echo "$GH_ACTIONS_RESPONSE" | jq empty 2>/dev/null; then
-              # Response is already valid JSON
-              GH_ACTIONS_SECRETS="$GH_ACTIONS_RESPONSE"
-          elif echo "$GH_ACTIONS_RESPONSE" | grep -q "^Secret value: "; then
-              # Response has "Secret value: " prefix, remove it
-              GH_ACTIONS_SECRETS=$(echo "$GH_ACTIONS_RESPONSE" | sed 's/^Secret value: //')
-          else
-              echo "Unexpected response format from Azure Function:"
-              echo "$GH_ACTIONS_RESPONSE"
-              exit 1
-          fi
+          # Remove "Secret value: " prefix if present
+          GH_ACTIONS_SECRETS=$(echo "$GH_ACTIONS_RESPONSE" | sed 's/^Secret value: //')
           
-          # Validate that we now have valid JSON
-          if ! echo "$GH_ACTIONS_SECRETS" | jq empty 2>/dev/null; then
-              echo "Invalid JSON after processing:"
-              echo "$GH_ACTIONS_SECRETS"
-              exit 1
-          fi
-
-          # Extract the REGISTRY_SERVER, REGISTRY_USERNAME, REGISTRY_PASSWORD from the GH_ACTIONS_SECRETS
-          REGISTRY_SERVER=$(echo "$GH_ACTIONS_SECRETS" | jq -r '.REGISTRY_SERVER')
-          REGISTRY_USERNAME=$(echo "$GH_ACTIONS_SECRETS" | jq -r '.REGISTRY_USERNAME')
-          REGISTRY_PASSWORD=$(echo "$GH_ACTIONS_SECRETS" | jq -r '.REGISTRY_PASSWORD')
+          # Parse key-value pairs from the response
+          REGISTRY_SERVER=$(echo "$GH_ACTIONS_SECRETS" | grep "^REGISTRY_SERVER=" | cut -d'=' -f2)
+          REGISTRY_USERNAME=$(echo "$GH_ACTIONS_SECRETS" | grep "^REGISTRY_USERNAME=" | cut -d'=' -f2)
+          REGISTRY_PASSWORD=$(echo "$GH_ACTIONS_SECRETS" | grep "^REGISTRY_PASSWORD=" | cut -d'=' -f2)
           
           # Validate that required values were extracted
-          if [ "$REGISTRY_SERVER" = "null" ] || [ "$REGISTRY_USERNAME" = "null" ] || [ "$REGISTRY_PASSWORD" = "null" ]; then
+          if [ -z "$REGISTRY_SERVER" ] || [ -z "$REGISTRY_USERNAME" ] || [ -z "$REGISTRY_PASSWORD" ]; then
               echo "Failed to extract required registry credentials from secrets:"
               echo "REGISTRY_SERVER: $REGISTRY_SERVER"
               echo "REGISTRY_USERNAME: $REGISTRY_USERNAME"
               echo "REGISTRY_PASSWORD: [hidden]"
+              echo ""
+              echo "Available secrets in response:"
+              echo "$GH_ACTIONS_SECRETS" | grep "^REGISTRY_"
               exit 1
           fi
 
