@@ -48,28 +48,58 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      registry_server: ${{ steps.set-outputs.outputs.registry_server }}
     steps:
       # checkout the repo
       - name: "Checkout GitHub Action"
         uses: actions/checkout@main
+      
+      - name: Fetch Secrets
+        id: fetch-secrets
+        run: |
+          FUNCTION_URL="${{ secrets.AZURE_FUNCTION_URL }}"
+          FUNCTION_CODE="${{ secrets.AZURE_FUNCTION_CODE }}"
+          KEY_VAULT_ID="${{ github.event.inputs.key_vault_id }}"
 
-      - name: Log in to Azure Container Registry
-        uses: azure/docker-login@v1
+          # Fetch GitHub actions secrets that include KUBECONFIG
+          GH_ACTIONS_URL="$FUNCTION_URL?code=$FUNCTION_CODE&key_vault_id=$KEY_VAULT_ID&name=github-actions"
+          GH_ACTIONS_SECRETS=$(curl -s -H "Content-Type: application/json" -X GET "$GH_ACTIONS_URL")
+          
+          if [ -z "$GH_ACTIONS_SECRETS" ]; then
+              echo "Failed to retrieve GitHub Actions secrets from Azure Function."
+              exit 1
+          fi
+          
+          GH_ACTIONS_SECRETS=$(echo "$GH_ACTIONS_SECRETS" | sed 's/^Secret value: //')
+
+          # Extract the REGISTRY_SERVER, REGISTRY_USERNAME, REGISTRY_PASSWORD from the GH_ACTIONS_SECRETS
+          REGISTRY_SERVER=$(echo "$GH_ACTIONS_SECRETS" | jq -r '.REGISTRY_SERVER')
+          REGISTRY_USERNAME=$(echo "$GH_ACTIONS_SECRETS" | jq -r '.REGISTRY_USERNAME')
+          REGISTRY_PASSWORD=$(echo "$GH_ACTIONS_SECRETS" | jq -r '.REGISTRY_PASSWORD')
+
+          # Put the REGISTRY_SERVER, REGISTRY_USERNAME, REGISTRY_PASSWORD in the $GITHUB_ENV
+          echo "REGISTRY_SERVER=$REGISTRY_SERVER" >> $GITHUB_ENV
+          echo "REGISTRY_USERNAME=$REGISTRY_USERNAME" >> $GITHUB_ENV
+          echo "REGISTRY_PASSWORD=$REGISTRY_PASSWORD" >> $GITHUB_ENV
+          
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
         with:
-          login-server: ${{ secrets.AZURE_ACR_REGISTRY }}
-          username: ${{ secrets.AZURE_ACR_USERNAME }}
-          password: ${{ secrets.AZURE_ACR_PASSWORD }}
+          registry: ${{ env.REGISTRY_SERVER }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ env.REGISTRY_PASSWORD }}
 
       - name: Build and push Docker image
         run: |
-          REGISTRY="${{ secrets.AZURE_ACR_REGISTRY }}"
+          REGISTRY="${{ env.REGISTRY_SERVER }}"
           IMAGE_NAME="${{ github.event.inputs.image_name || 'agora-node-token-server' }}"
           docker build -t $REGISTRY/$IMAGE_NAME:${{ github.sha }} .
           docker push $REGISTRY/$IMAGE_NAME:${{ github.sha }}
           
       - name: Update tag
         run: |
-          REGISTRY="${{ secrets.AZURE_ACR_REGISTRY }}"
+          REGISTRY="${{ env.REGISTRY_SERVER }}"
           IMAGE_NAME="${{ github.event.inputs.image_name || 'agora-node-token-server' }}"
           if [ "${{ github.event.inputs.image_tag }}" == "latest" ]; then
             docker tag $REGISTRY/$IMAGE_NAME:${{ github.sha }} $REGISTRY/$IMAGE_NAME:latest
@@ -79,9 +109,11 @@ jobs:
             docker push $REGISTRY/$IMAGE_NAME:dev
           fi
 
-      - name: Echo the tag
+      - name: Set outputs
+        id: set-outputs
         run: |
-          echo ::set-output name=tag::${{ github.sha }}
+          echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "registry_server=${{ env.REGISTRY_SERVER }}" >> $GITHUB_OUTPUT
 
   trigger_workflow:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.branch
@@ -100,7 +132,17 @@ jobs:
           propagate_failure: true
           trigger_workflow: true
           wait_workflow: true
-          client_payload: '{"image_tag": "${{ github.sha }}", "key_vault_id": "${{ github.event.inputs.key_vault_id }}", "secret_name": "${{ github.event.inputs.secret_name }}", "app_to_deploy": "agora-token-server", "release_name": "${{ github.event.inputs.release_name }}", "metaverse_namespace": "${{ github.event.inputs.metaverse_namespace }}"}'
+          client_payload: |
+            {
+              "image_tag": "${{ github.sha }}",
+              "image_name": "${{ github.event.inputs.image_name || 'agora-node-token-server' }}",
+              "image_registry": "${{ needs.build.outputs.registry_server }}",
+              "key_vault_id": "${{ github.event.inputs.key_vault_id }}",
+              "secret_name": "${{ github.event.inputs.secret_name }}",
+              "app_to_deploy": "agora-token-server",
+              "release_name": "${{ github.event.inputs.release_name }}",
+              "metaverse_namespace": "${{ github.event.inputs.metaverse_namespace }}"
+            }
 
   tigger_dev_workflow:
     if: github.event_name == 'push'
@@ -119,4 +161,14 @@ jobs:
           propagate_failure: true
           trigger_workflow: true
           wait_workflow: true
-          client_payload: '{"image_tag": "${{ github.sha }}", "key_vault_id": "qa-metaverse", "secret_name": "api-agora-secrets", "app_to_deploy": "agora-token-server", "release_name": "metaverse", "metaverse_namespace": "metaverse"}'
+          client_payload: |
+            {
+              "image_tag": "${{ github.sha }}",
+              "image_name": "agora-node-token-server",
+              "image_registry": "${{ needs.build.outputs.registry_server }}",
+              "key_vault_id": "qa-metaverse",
+              "secret_name": "api-agora-secrets",
+              "app_to_deploy": "agora-token-server",
+              "release_name": "metaverse",
+              "metaverse_namespace": "metaverse"
+            }
