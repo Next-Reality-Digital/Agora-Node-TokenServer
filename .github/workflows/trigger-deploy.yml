@@ -39,14 +39,41 @@ on:
         required: true
         default: "agora-node-token-server"
 
-env:
-  REGISTRY: ${{ secrets.AZURE_ACR_REGISTRY }}
-  IMAGE_NAME: ${{ github.event.inputs.image_name || 'agora-node-token-server' }}
-
 jobs:
   trigger_workflow:
     runs-on: ubuntu-latest
     steps:
+      - name: Fetch Secrets
+        id: fetch-secrets
+        run: |
+          FUNCTION_URL="${{ secrets.AZURE_FUNCTION_URL }}"
+          FUNCTION_CODE="${{ secrets.AZURE_FUNCTION_CODE }}"
+          KEY_VAULT_ID="${{ github.event.inputs.key_vault_id }}"
+
+          # Fetch GitHub actions secrets that include KUBECONFIG
+          GH_ACTIONS_URL="$FUNCTION_URL?code=$FUNCTION_CODE&key_vault_id=$KEY_VAULT_ID&name=github-actions"
+          GH_ACTIONS_RESPONSE=$(curl -s -H "Content-Type: application/json" -X GET "$GH_ACTIONS_URL")
+          
+          if [ -z "$GH_ACTIONS_RESPONSE" ]; then
+              echo "Failed to retrieve GitHub Actions secrets from Azure Function."
+              exit 1
+          fi
+          
+          # Remove "Secret value: " prefix if present
+          GH_ACTIONS_SECRETS=$(echo "$GH_ACTIONS_RESPONSE" | sed 's/^Secret value: //')
+          
+          # Parse key-value pairs from the response
+          REGISTRY_SERVER=$(echo "$GH_ACTIONS_SECRETS" | grep "^REGISTRY_SERVER=" | cut -d'=' -f2)
+          
+          # Validate that required values were extracted
+          if [ -z "$REGISTRY_SERVER" ]; then
+              echo "Failed to extract required registry credentials from secrets"
+              exit 1
+          fi
+
+          # Put the REGISTRY_SERVER, REGISTRY_USERNAME, REGISTRY_PASSWORD in the $GITHUB_ENV
+          echo "REGISTRY_SERVER=$REGISTRY_SERVER" >> $GITHUB_ENV
+
       - name: Trigger Helm Chart deployment
         uses: convictional/trigger-workflow-and-wait@v1.6.1
         with:
@@ -59,4 +86,4 @@ jobs:
           propagate_failure: true
           trigger_workflow: true
           wait_workflow: true
-          client_payload: '{"image_tag": "${{ github.event.inputs.image_tag }}", "key_vault_id": "${{ github.event.inputs.key_vault_id }}", "secret_name": "${{ github.event.inputs.secret_name }}", "app_to_deploy": "agora-token-server", "release_name": "${{ github.event.inputs.release_name }}", "metaverse_namespace": "${{ github.event.inputs.metaverse_namespace }}"}'
+          client_payload: '{"image_tag": "${{ github.event.inputs.image_tag }}", "key_vault_id": "${{ github.event.inputs.key_vault_id }}", "secret_name": "${{ github.event.inputs.secret_name }}", "app_to_deploy": "agora-token-server", "release_name": "${{ github.event.inputs.release_name }}", "metaverse_namespace": "${{ github.event.inputs.metaverse_namespace }}", "image_registry": "${{ env.REGISTRY_SERVER }}", "image_name": "${{ github.event.inputs.image_name }}"}'
