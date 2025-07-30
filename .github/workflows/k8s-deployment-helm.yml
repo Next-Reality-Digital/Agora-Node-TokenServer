@@ -71,9 +71,6 @@ jobs:
               exit 1
           fi
           
-          echo "Raw response from Azure Function:"
-          echo "$GH_ACTIONS_RESPONSE"
-          
           # Remove "Secret value: " prefix if present
           GH_ACTIONS_SECRETS=$(echo "$GH_ACTIONS_RESPONSE" | sed 's/^Secret value: //')
           
@@ -84,13 +81,7 @@ jobs:
           
           # Validate that required values were extracted
           if [ -z "$REGISTRY_SERVER" ] || [ -z "$REGISTRY_USERNAME" ] || [ -z "$REGISTRY_PASSWORD" ]; then
-              echo "Failed to extract required registry credentials from secrets:"
-              echo "REGISTRY_SERVER: $REGISTRY_SERVER"
-              echo "REGISTRY_USERNAME: $REGISTRY_USERNAME"
-              echo "REGISTRY_PASSWORD: [hidden]"
-              echo ""
-              echo "Available secrets in response:"
-              echo "$GH_ACTIONS_SECRETS" | grep "^REGISTRY_"
+              echo "Failed to extract required registry credentials from secrets"
               exit 1
           fi
 
