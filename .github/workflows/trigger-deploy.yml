@@ -3,8 +3,16 @@ name: Trigger Deploy
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: "Target deployment environment"
+        required: true
+        type: choice
+        options:
+          - nextrealitydigital
+          - mudfoundation
+        default: "nextrealitydigital"
       key_vault_id:
-        description: "Azure Key Vault ID"
+        description: "Key Vault ID"
         required: true
         type: string
         default: "qa-metaverse"
@@ -42,12 +50,26 @@ on:
 jobs:
   trigger_workflow:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'nextrealitydigital' }}
     steps:
       - name: Fetch Secrets
         id: fetch-secrets
+        env:
+          NRD_FUNCTION_URL: ${{ secrets.NRD_FUNCTION_URL }}
+          NRD_FUNCTION_CODE: ${{ secrets.NRD_FUNCTION_CODE }}
+          MUD_FUNCTION_URL: ${{ secrets.MUD_FUNCTION_URL }}
+          MUD_FUNCTION_CODE: ${{ secrets.MUD_FUNCTION_CODE }}
         run: |
-          FUNCTION_URL="${{ secrets.AZURE_FUNCTION_URL }}"
-          FUNCTION_CODE="${{ secrets.AZURE_FUNCTION_CODE }}"
+          TARGET_ENV_LOWER="${{ github.event.inputs.environment || 'nextrealitydigital' }}"
+          PREFIX=$(echo "$TARGET_ENV_LOWER" | tr '[:lower:]' '[:upper:]')
+          echo "Target environment selected: $TARGET_ENV_LOWER (Prefix: $PREFIX)"
+
+          URL_VAR_NAME="${PREFIX}_FUNCTION_URL"
+          CODE_VAR_NAME="${PREFIX}_FUNCTION_CODE"
+
+          FUNCTION_URL="${!URL_VAR_NAME}"
+          FUNCTION_CODE="${!CODE_VAR_NAME}"
+
           KEY_VAULT_ID="${{ github.event.inputs.key_vault_id }}"
 
           # Fetch GitHub actions secrets that include KUBECONFIG
@@ -55,7 +77,7 @@ jobs:
           GH_ACTIONS_RESPONSE=$(curl -s -H "Content-Type: application/json" -X GET "$GH_ACTIONS_URL")
           
           if [ -z "$GH_ACTIONS_RESPONSE" ]; then
-              echo "Failed to retrieve GitHub Actions secrets from Azure Function."
+              echo "Failed to retrieve GitHub Actions secrets from Function."
               exit 1
           fi
           
@@ -71,7 +93,7 @@ jobs:
               exit 1
           fi
 
-          # Put the REGISTRY_SERVER, REGISTRY_USERNAME, REGISTRY_PASSWORD in the $GITHUB_ENV
+          # Put the REGISTRY_SERVER in the $GITHUB_ENV
           echo "REGISTRY_SERVER=$REGISTRY_SERVER" >> $GITHUB_ENV
 
       - name: Trigger Helm Chart deployment
