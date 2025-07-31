@@ -108,4 +108,4 @@ jobs:
           propagate_failure: true
           trigger_workflow: true
           wait_workflow: true
-          client_payload: '{"image_tag": "${{ github.event.inputs.image_tag }}", "key_vault_id": "${{ github.event.inputs.key_vault_id }}", "secret_name": "${{ github.event.inputs.secret_name }}", "app_to_deploy": "agora-token-server", "release_name": "${{ github.event.inputs.release_name }}", "metaverse_namespace": "${{ github.event.inputs.metaverse_namespace }}", "image_registry": "${{ env.REGISTRY_SERVER }}", "image_name": "${{ github.event.inputs.image_name }}"}'
+          client_payload: '{"image_tag": "${{ github.event.inputs.image_tag }}", "key_vault_id": "${{ github.event.inputs.key_vault_id }}", "secret_name": "${{ github.event.inputs.secret_name }}", "app_to_deploy": "agora-token-server", "release_name": "${{ github.event.inputs.release_name }}", "metaverse_namespace": "${{ github.event.inputs.metaverse_namespace }}", "image_registry": "${{ env.REGISTRY_SERVER }}", "image_name": "${{ github.event.inputs.image_name }}", "environment": "${{ github.event.inputs.environment }}"}'

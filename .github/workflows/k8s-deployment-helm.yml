@@ -166,7 +166,8 @@ jobs:
               "secret_name": "${{ github.event.inputs.secret_name }}",
               "app_to_deploy": "agora-token-server",
               "release_name": "${{ github.event.inputs.release_name }}",
-              "metaverse_namespace": "${{ github.event.inputs.metaverse_namespace }}"
+              "metaverse_namespace": "${{ github.event.inputs.metaverse_namespace }}",
+              "environment": "${{ github.event.inputs.environment }}"
             }
 
   tigger_dev_workflow:
@@ -195,5 +196,6 @@ jobs:
               "secret_name": "api-agora-secrets",
               "app_to_deploy": "agora-token-server",
               "release_name": "metaverse",
-              "metaverse_namespace": "metaverse"
+              "metaverse_namespace": "metaverse",
+              "environment": "nrd"
             }
