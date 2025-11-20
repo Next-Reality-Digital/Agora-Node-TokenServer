@@ -192,3 +192,8 @@ After triggering a workflow:
 2. The workflow will show each step's status
 3. Check the logs if any step fails
 4. Once complete, verify the deployment in your Kubernetes cluster
+
+## Repository Dependencies
+
+This repository can function independently but is used by:
+- [agora-meetings](https://github.com/Next-Reality-Digital/agora-meetings)
