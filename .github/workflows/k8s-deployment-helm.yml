@@ -10,12 +10,12 @@ on:
         options:
           - nrd
           - mud
-        default: "nrd"
+        default: "mud"
       key_vault_id:
         description: "Key Vault ID"
         required: true
         type: string
-        default: "qa-metaverse"
+        default: "onland-metaverse-qa"
       secret_name:
         description: "Secret Name"
         required: true
@@ -25,12 +25,12 @@ on:
         description: "Helm release name"
         required: true
         type: string
-        default: "metaverse"
+        default: "qa"
       metaverse_namespace:
-        description: "Metaverse namespace"
+        description: "Kubernetes namespace where the app is installed"
         required: true
         type: string
-        default: "metaverse"
+        default: "qa"
       image_tag:
         type: choice
         options:
@@ -56,7 +56,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'nextrealitydigital' }}
+    environment: ${{ github.event.inputs.environment || 'mud' }}
     outputs:
       registry_server: ${{ steps.set-outputs.outputs.registry_server }}
     steps:
@@ -72,7 +72,7 @@ jobs:
           MUD_FUNCTION_URL: ${{ secrets.MUD_FUNCTION_URL }}
           MUD_FUNCTION_CODE: ${{ secrets.MUD_FUNCTION_CODE }}
         run: |
-          TARGET_ENV_LOWER="${{ github.event.inputs.environment || 'nrd' }}"
+          TARGET_ENV_LOWER="${{ github.event.inputs.environment || 'mud' }}"
           PREFIX=$(echo "$TARGET_ENV_LOWER" | tr '[:lower:]' '[:upper:]')
           echo "Target environment selected: $TARGET_ENV_LOWER (Prefix: $PREFIX)"
 
@@ -192,10 +192,10 @@ jobs:
               "image_tag": "${{ github.sha }}",
               "image_name": "agora-node-token-server",
               "image_registry": "${{ needs.build.outputs.registry_server }}",
-              "key_vault_id": "qa-metaverse",
+              "key_vault_id": "onland-metaverse-qa",
               "secret_name": "api-agora-secrets",
               "app_to_deploy": "agora-token-server",
-              "release_name": "metaverse",
-              "metaverse_namespace": "metaverse",
-              "environment": "nrd"
+              "release_name": "qa",
+              "metaverse_namespace": "qa",
+              "environment": "mud"
             }
